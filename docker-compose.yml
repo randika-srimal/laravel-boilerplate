@@ -1,0 +1,132 @@
+version: "3.9"
+
+services:
+  laravel-boilerplate-app:
+    profiles: ["main"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        uid: ${UID}
+    image: laravel-boilerplate-app:latest
+    container_name: laravel-boilerplate-app-container
+    volumes:
+      - ./:/var/www/html:delegated
+      - ./docker-configs/php.ini:/usr/local/etc/php/php.ini:ro
+    ports:
+      - 8001:80
+      - 5173:5173 #Vite Port
+    depends_on:
+      - laravel-boilerplate-mariadb
+      - laravel-boilerplate-redis-server
+
+  laravel-boilerplate-redis-server:
+    profiles: ["main"]
+    image: "redis:alpine"
+    command: redis-server
+    container_name: laravel-boilerplate-redis-server-container
+    ports:
+      - "6379:6379"
+
+  laravel-boilerplate-mariadb:
+    profiles: ["main"]
+    image: mariadb:11.2.2
+    container_name: laravel-boilerplate-mariadb
+    command:
+      [
+        '--default-time-zone=+00:00',
+        '--default-authentication-plugin=mysql_native_password'
+      ]
+    ports:
+      - 3307:3306
+    environment:
+      - MARIADB_ROOT_PASSWORD=root
+    volumes:
+      - laravel-boilerplate-mariadb-data:/var/lib/mysql
+
+  laravel-boilerplate-phpmyadmin:
+    profiles: ["main"]
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: laravel-boilerplate-phpmyadmin
+    environment:
+      - PMA_HOST=laravel-boilerplate-mariadb
+      - PMA_USER=root
+      - PMA_PASSWORD=root
+      - UPLOAD_LIMIT=120M
+    ports:
+      - "8002:80"
+    depends_on:
+      - laravel-boilerplate-mariadb
+
+  laravel-boilerplate-sonarqube-postgres:
+    profiles: ["sonarqube"]
+    image: postgres:15.3
+    container_name: laravel-boilerplate-sonarqube-postgres-container
+    restart: always
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - sonarqube-postgres-data:/var/lib/postgresql/data
+
+  laravel-boilerplate-sonarqube-adminer:
+    profiles: ["sonarqube"]
+    image: adminer:latest
+    container_name: laravel-boilerplate-sonarqube-adminer
+    restart: always
+    ports:
+      - 8003:8080
+    depends_on:
+      - laravel-boilerplate-sonarqube-postgres
+
+  laravel-boilerplate-sonarqube:
+    profiles: ["sonarqube"]
+    image: sonarqube:10.1.0-community
+    container_name: laravel-boilerplate-sonarqube-container
+    environment:
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+      SONAR_JDBC_USERNAME: postgres
+      SONAR_JDBC_PASSWORD: postgres
+      SONAR_JDBC_URL: jdbc:postgresql://laravel-boilerplate-sonarqube-postgres:5432/sonar
+    ports:
+      - 9000:9000
+    links:
+      - laravel-boilerplate-sonarqube-postgres
+    volumes:
+      - sonarqube-data:/opt/sonarqube/data
+      - sonarqube-logs:/opt/sonarqube/logs
+      - sonarqube-extensions:/opt/sonarqube/extensions
+    depends_on:
+      - laravel-boilerplate-sonarqube-postgres
+
+  laravel-boilerplate-sonarqube-scanner:
+    profiles: ["sonarqube"]
+    image: sonarsource/sonar-scanner-cli:latest
+    container_name: laravel-boilerplate-sonarqube-scanner-container
+    environment:
+      SONAR_HOST_URL: "http://laravel-boilerplate-sonarqube:9000"
+      SONAR_SCANNER_OPTS: "-Dsonar.projectKey=${SONARQUBE_PROJECT_KEY}"
+      SONAR_TOKEN: ${SONARQUBE_PROJECT_TOKEN}
+    volumes:
+      - ./:/usr/src
+    links:
+      - laravel-boilerplate-sonarqube
+    depends_on:
+      - laravel-boilerplate-sonarqube
+
+  laravel-boilerplate-docs:
+    profiles: ["main"]
+    image: nginx
+    container_name: laravel-boilerplate-docs-container
+    ports:
+      - 8004:80
+    volumes:
+      - ./docs:/usr/share/nginx/html
+
+volumes:
+  laravel-boilerplate-mariadb-data:
+  sonarqube-data:
+  sonarqube-logs:
+  sonarqube-extensions:
+  sonarqube-postgres-data:
