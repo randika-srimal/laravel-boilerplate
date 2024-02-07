@@ -9,7 +9,7 @@ CHOICE=$(gum choose "Format Code Base" "Commit Changes" )
 
 if [ "$CHOICE" = "Format Code Base" ]
 then
-    npx blade-formatter --write resources/**/*.blade.php && ./vendor/bin/pint -v
+    npx blade-formatter --write resources/**/*.blade.php && npx prettier --write './**/*.{css,js,html}' && ./vendor/bin/pint -v
 elif [ "$CHOICE" = "Commit Changes" ]
 then
     npx better-commits
